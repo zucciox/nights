@@ -6,6 +6,7 @@ import com.enzorocksmith.MOTM.entity.client.crescent_knight.CrescentKnightRender
 import com.enzorocksmith.MOTM.entity.client.remnant_heart.RemnantHeartRenderer;
 import com.enzorocksmith.MOTM.entity.client.shambler.ShamblerRenderer;
 import com.enzorocksmith.MOTM.entity.client.slinger.SlingerRenderer;
+import com.enzorocksmith.MOTM.entity.client.leaper.SwarmerRenderer;
 import com.enzorocksmith.MOTM.entity.custom.MoonRockProjectile;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.renderer.entity.EntityRenderers;
@@ -85,6 +86,7 @@ public class MOTM
             EntityRenderers.register(ModEntities.SHAMBLER.get(), ShamblerRenderer::new);
             EntityRenderers.register(ModEntities.SLINGER.get(), SlingerRenderer::new);
             EntityRenderers.register(ModEntities.CRESCENTKNIGHT.get(), CrescentKnightRenderer::new);
+            EntityRenderers.register(ModEntities.SWARMER.get(), SwarmerRenderer::new);
 
             EntityRenderers.register(ModEntities.MOONROCKPROJECTILE.get(), MoonRockRenderer::new);
         }

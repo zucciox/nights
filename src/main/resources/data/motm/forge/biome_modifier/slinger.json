@@ -3,8 +3,8 @@
   "biomes": "#minecraft:is_overworld",
   "spawners": {
     "type": "motm:slinger",
-    "weight": 50,
-    "minCount": 1,
+    "weight": 10,
+    "minCount": 2,
     "maxCount": 3
   }
 }

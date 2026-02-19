@@ -4,9 +4,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class BlockBreakMap {
-    public static HashMap<BlockPos, BlockBreakEntry> map = new HashMap<>();
+    public static ConcurrentHashMap<BlockPos, BlockBreakEntry> map = new ConcurrentHashMap<>();
 
     public static void tickTickers() {
         for (BlockBreakEntry i : map.values()) {
