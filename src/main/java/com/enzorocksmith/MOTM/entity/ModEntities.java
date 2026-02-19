@@ -41,6 +41,11 @@ public class ModEntities {
                     () -> EntityType.Builder.of(CrescentKnight::new, MobCategory.CREATURE)
                             .sized(.8f, 2.7f)
                             .build("crescent_knight"));
+    public static final Supplier<EntityType<Leaper>> SWARMER =
+            ENTITIES.register("leaper",
+                    () -> EntityType.Builder.of(Leaper::new, MobCategory.CREATURE)
+                            .sized(.4f, .8f)
+                            .build("leaper"));
 
 
     public static void register(IEventBus eventBus){ ENTITIES.register(eventBus);

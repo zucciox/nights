@@ -317,7 +317,7 @@ public class MMNodeEvaluator extends NodeEvaluator {
     }
 
     private double getMobJumpHeight() {
-        return 3;
+        return 10;
         //return Math.max((double)1.125F, (double)this.mob.getStepHeight());
     }
 

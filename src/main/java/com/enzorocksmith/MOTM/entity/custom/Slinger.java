@@ -85,7 +85,7 @@ public class Slinger extends MoonMob implements GeoEntity {
     protected void registerGoals() {
 
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        //this.goalSelector.addGoal(1, new MoonMobFollowTargetGoal(this, 1, true));
+        this.goalSelector.addGoal(1, new MoonMobFollowTargetGoal(this, 1, true));
         this.goalSelector.addGoal(3, new RandomLookAroundGoal(this));
         this.goalSelector.addGoal(3, new RandomStrollGoal(this, 1));
         this.goalSelector.addGoal(3, new FollowMMGoal(this, 1, 5, 30));
@@ -118,9 +118,6 @@ public class Slinger extends MoonMob implements GeoEntity {
         }
 
         if (animationState.isMoving()) {
-
-
-
             animationState.getController().setAnimation(RawAnimation.begin().then("walk", Animation.LoopType.LOOP));
             return PlayState.CONTINUE;
         }

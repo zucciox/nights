@@ -42,11 +42,13 @@ public class MoonRockProjectile extends AbstractArrow {
 
         Random random = new Random();
         MobEffectInstance effect = new MobEffectInstance(MobEffects.WEAKNESS, 35, 1, false, false, false);
+        if (!(result.getEntity() instanceof LivingEntity)) return;
+
         LivingEntity entity = (LivingEntity) result.getEntity();
 
         switch (random.nextInt(0, 2)) {
             case 0: effect = new MobEffectInstance(MobEffects.BLINDNESS, 35, 1, false, false, false); break;
-            case 1: effect = new MobEffectInstance(MobEffects.WEAKNESS, 35, 1, false, false, false); break;
+            case 1: effect = new MobEffectInstance(MobEffects.WEAKNESS, 35, 0, false, false, false); break;
             case 2: effect = new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 35, 1, false, false, false); break;
             }
 

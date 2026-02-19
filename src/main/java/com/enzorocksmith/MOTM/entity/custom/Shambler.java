@@ -245,7 +245,7 @@ public class Shambler extends MoonMob implements GeoEntity {
             breakCoolDown = 100;
         }
 
-        if (this.tickCount == triggerEffectTime) {
+        if (this.tickCount == triggerEffectTime && defineGroupSize() >= 5) {
 
             for (BlockPos block : blocks) {
 

@@ -1,9 +1,9 @@
 package com.enzorocksmith.MOTM.events;
 
 import com.enzorocksmith.MOTM.blockMap.BlockBreakMap;
+import com.enzorocksmith.MOTM.entity.custom.Leaper;
 import com.enzorocksmith.MOTM.entity.custom.MoonMob;
 import com.enzorocksmith.MOTM.entity.custom.RemnantHeart;
-import com.enzorocksmith.MOTM.entity.custom.Shambler;
 import com.enzorocksmith.MOTM.nightprogression.NightProgression;
 import com.enzorocksmith.MOTM.MOTM;
 import com.enzorocksmith.MOTM.utilities.MOTMUtils;
@@ -12,6 +12,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
+import net.minecraftforge.event.entity.living.LivingFallEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -59,5 +60,10 @@ public class GameEvents {
         if (event.getEntity() instanceof MoonMob && !event.getEntity().isDeadOrDying()) {
             ((MoonMob) event.getEntity()).triggerAnim("hurt", "hurt");
         }
+    }
+
+    @SubscribeEvent
+    public static void fallDamage(LivingFallEvent event) {
+        if (event.getEntity() instanceof Leaper) event.setCanceled(true);
     }
 }

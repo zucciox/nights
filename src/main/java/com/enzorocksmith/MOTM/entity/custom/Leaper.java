@@ -7,7 +7,6 @@ import com.enzorocksmith.MOTM.entity.navigation.FollowMMGoal;
 import com.enzorocksmith.MOTM.entity.navigation.MMPathNavigation;
 import com.enzorocksmith.MOTM.entity.navigation.MoonMobFollowTargetGoal;
 import com.enzorocksmith.MOTM.utilities.MOTMUtils;
-import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.Registries;
@@ -18,13 +17,10 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.*;
-import net.minecraft.world.entity.ai.navigation.FlyingPathNavigation;
 import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.level.*;
@@ -39,30 +35,32 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Random;
 
-public class CrescentKnight extends MoonMob implements GeoEntity {
+public class Leaper extends MoonMob implements GeoEntity {
     private final AnimatableInstanceCache geoCache = GeckoLibUtil.createInstanceCache(this);
     public int hordeSpawned;
     public int attackCoolDown = 100;
     public int breakCoolDown;
+    public int jumpCoolDown;
+    public int triggerJumpTime;
     public int attackVariant;
     int triggerEffectTime;
     boolean isAttacking;
+    boolean protectJump;
     Random random;
 
     // Triggerable Raw Animations
 
-    private final RawAnimation slam = RawAnimation.begin().thenPlay("slam");
-    private final RawAnimation punch = RawAnimation.begin().thenPlay("punch");
-    private final RawAnimation sweep = RawAnimation.begin().thenPlay("sweep");
+    private final RawAnimation attack = RawAnimation.begin().thenPlay("attack");
+    private final RawAnimation jump = RawAnimation.begin().thenPlay("jump");
     private final RawAnimation death = RawAnimation.begin().thenPlay("death");
     private final RawAnimation hurt = RawAnimation.begin().thenPlay("hurt");
 
-    public CrescentKnight(EntityType<? extends PathfinderMob> entityType, Level level) {
+    public Leaper(EntityType<? extends PathfinderMob> entityType, Level level) {
         super(entityType, level);
         random = new Random();
+        //this.setMaxUpStep(10);
     }
 
     @Override
@@ -75,15 +73,16 @@ public class CrescentKnight extends MoonMob implements GeoEntity {
     }
 
     protected PathNavigation createNavigation(Level world) {
-        return new GroundPathNavigation(this, world);
+        return new MMPathNavigation(this, world);
     }
 
     public static AttributeSupplier.Builder createAttributes() {
         return Mob.createMobAttributes()
-                .add(Attributes.MAX_HEALTH, 80.0D)
-                .add(Attributes.MOVEMENT_SPEED, .2)
-                .add(Attributes.ATTACK_DAMAGE, 2)
-                .add(Attributes.KNOCKBACK_RESISTANCE, 5);
+                .add(Attributes.MAX_HEALTH, 15.0D)
+                .add(Attributes.MOVEMENT_SPEED, .35)
+                .add(Attributes.ATTACK_DAMAGE, 2);
+                //.add(Attributes.JUMP_STRENGTH, 2);
+
     }
 
     // Register animations controllers
@@ -92,23 +91,21 @@ public class CrescentKnight extends MoonMob implements GeoEntity {
         controllers.add(new AnimationController<>(this, "controller", 5, this::predicate));
         controllers.add(new AnimationController<>(this, "hurt", state -> PlayState.STOP)
                 .triggerableAnim("hurt", hurt));
-        controllers.add(new AnimationController<>(this, "sweep", 5, state -> PlayState.STOP)
-                .triggerableAnim("sweep", sweep));
-        controllers.add(new AnimationController<>(this, "slam", 5, state -> PlayState.STOP)
-                .triggerableAnim("slam", slam));
-        controllers.add(new AnimationController<>(this, "punch", 5, state -> PlayState.STOP)
-                .triggerableAnim("punch", punch));
         controllers.add(new AnimationController<>(this, "death", state -> PlayState.STOP)
                 .triggerableAnim("death", death));
+        controllers.add(new AnimationController<>(this, "attack", state -> PlayState.STOP)
+                .triggerableAnim("attack", attack));
+        controllers.add(new AnimationController<>(this, "jump", state -> PlayState.STOP)
+                .triggerableAnim("jump", jump));
     }
 
     // loop or play animations based on the entity's state
-    private PlayState predicate(AnimationState<CrescentKnight> animationState) {
+    private PlayState predicate(AnimationState<Leaper> animationState) {
         if (this.isDeadOrDying()) {
             triggerAnim("death", "death");
             return PlayState.CONTINUE;
         }
-        if (this.getDeltaMovement() != Vec3.ZERO) {
+        if (animationState.isMoving()) {
             animationState.getController().setAnimation(RawAnimation.begin().then("walk", Animation.LoopType.LOOP));
             return PlayState.CONTINUE;
         }
@@ -120,10 +117,18 @@ public class CrescentKnight extends MoonMob implements GeoEntity {
     public void tick() {
         super.tick();
 
+        if (!this.level().isClientSide) {
+            ServerLevel level = (ServerLevel) level();
+            if (this.getNavigation().getPath() != null)  level.sendParticles(ParticleTypes.HAPPY_VILLAGER, this.moveControl.getWantedX(), this.moveControl.getWantedY(), this.moveControl.getWantedZ(), 1, 0, 0, 0, 0);
+
+        }
+
         this.setTarget(targetSel());
         if (this.getTarget() != null) {
             this.meleeAttack();
-            this.tryBlockBreak();
+            this.tryJump();
+            //this.tryBlockBreak();
+            this.checkCollide();
         }
     }
 
@@ -137,7 +142,7 @@ public class CrescentKnight extends MoonMob implements GeoEntity {
     protected void tickDeath() {
         ++this.deathTime;
         if (this.deathTime == 20) {
-            this.remove(CrescentKnight.RemovalReason.KILLED);
+            this.remove(Leaper.RemovalReason.KILLED);
         }
     }
 
@@ -147,6 +152,8 @@ public class CrescentKnight extends MoonMob implements GeoEntity {
         tag.putInt("hordeSpawned", hordeSpawned);
         tag.putInt("attackCoolDown", attackCoolDown);
         tag.putInt("breakCoolDown", breakCoolDown);
+        tag.putInt("jumpCoolDown", jumpCoolDown);
+        tag.putInt("triggerJumpTime", triggerJumpTime);
     }
 
     @Override
@@ -160,6 +167,12 @@ public class CrescentKnight extends MoonMob implements GeoEntity {
         }
         if (tag.contains("breakCoolDown")) {
             attackCoolDown = tag.getInt("breakCoolDown");
+        }
+        if (tag.contains("jumpCoolDown")) {
+            jumpCoolDown = tag.getInt("jumpCoolDown");
+        }
+        if (tag.contains("triggerJumpTime")) {
+            triggerJumpTime = tag.getInt("triggerJumpTime");
         }
     }
 
@@ -190,52 +203,63 @@ public class CrescentKnight extends MoonMob implements GeoEntity {
 
         //if (this.getNavigation().isStuck()) MOTMUtils.printToChat("is stuck");
 
-        if ((MOTMUtils.vecDist(this.getTarget().position(), this.position()) <= 2.5) && attackCoolDown <= 0 && this.hasLineOfSight(this.getTarget())) {
+        if ((MOTMUtils.vecDist(this.getTarget().position(), this.position()) <= 10) && attackCoolDown <= 0 && this.hasLineOfSight(this.getTarget())) {
+
+            this.triggerAnim("attack", "attack");
+
             attackCoolDown = 60 + random.nextInt(-20, 20);
-            isAttacking = true;
 
-            attackVariant = random.nextInt(1, 4);
-            int tickDelay = 0;
+            //int tickDelay = 0;
 
-            switch (attackVariant) {
-                case 1: // Slam
-                    tickDelay = 28;
-                    triggerAnim("slam", "slam");
-                    break;
-                case 2: // Sweep
-                    triggerAnim("sweep", "sweep");
-                    tickDelay = 22;
-                    break;
-                case 3: // Punch
-                    triggerAnim("punch", "punch");
-                    tickDelay = 18;
-                    break;
-            }
-            triggerEffectTime = tickCount + tickDelay;
+            triggerEffectTime = tickCount + 5;
         }
 
         // Trigger Attack Effect
-        if (!this.isDeadOrDying() && tickCount == triggerEffectTime && (MOTMUtils.vecDist(this.getTarget().position(), this.position()) <= 2.75) && this.hasLineOfSight(this.getTarget())) {
-            this.getTarget().hurt(
-                    new DamageSource(this.level().registryAccess().registryOrThrow(Registries.DAMAGE_TYPE).getHolderOrThrow(DamageTypes.MOB_ATTACK)),
-                    10
-            );
+        if (!this.isDeadOrDying() && tickCount == triggerEffectTime && /*(MOTMUtils.vecDist(this.getTarget().position(), this.position()) <= 2.75) &&  */this.hasLineOfSight(this.getTarget())) {
 
-            switch (attackVariant) {
-                case 2, 3:
-                    this.getTarget().addDeltaMovement(this.getLookAngle().add(0, -getLookAngle().y + .5, 0));
-                    break;
-                case 1:
-                    MobEffectInstance effect = new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 35, 1, false, false, false);
-                    this.getTarget().addEffect(effect);
-                    break;
-            }
+            Vec3 launchAngle = this.getTarget().getEyePosition().subtract(this.position()).normalize().multiply(1.5f, 0, 1.5f).add(0, distanceTo(getTarget())/10, 0);
+            this.addDeltaMovement(launchAngle);
+            this.protectJump = true;
+            this.isAttacking = true;
 
             triggerEffectTime = Integer.MAX_VALUE;
-            isAttacking = false;
+            //isAttacking = false;
         }
-        
+
         attackCoolDown--;
+    }
+
+    public void checkCollide(){
+
+        if (this.onGround() && !this.protectJump) {
+            if (this.isAttacking) {
+                this.isAttacking = false;
+                this.stopTriggeredAnimation("attack", "attack");
+            }
+        }
+
+        if (this.isAttacking) protectJump = false;
+
+        if (this.level().isClientSide()) return;
+
+        List<Entity> collisions = this.level().getEntities(this, this.getBoundingBox().inflate(0.5D));
+        for (Entity other : collisions) {
+            if (other != this && this.getBoundingBox().intersects(other.getBoundingBox()) && other == this.getTarget() && this.isAttacking) {
+                MOTMUtils.printToChat("collided with target");
+
+                this.stopTriggeredAnimation("attack", "attack");
+
+                this.getTarget().hurt(
+                        new DamageSource(this.level().registryAccess().registryOrThrow(Registries.DAMAGE_TYPE).getHolderOrThrow(DamageTypes.MOB_ATTACK)),
+                        5
+                );
+
+                this.getTarget().addDeltaMovement(this.getTarget().getEyePosition().subtract(this.position()).normalize().multiply(1, 0, 1).add(0, .5, 0));
+
+                this.isAttacking = false;
+            }
+        }
+
     }
 
     public BlockPos[] getBlocksInFront() {
@@ -270,11 +294,6 @@ public class CrescentKnight extends MoonMob implements GeoEntity {
         if (level().isClientSide()) return;
         BlockPos[] blocks = getBlocksInFront();
 
-
-        ServerLevel level = (ServerLevel) level();
-        if (this.getNavigation().getPath() != null) {
-        level.sendParticles(ParticleTypes.HAPPY_VILLAGER, this.moveControl.getWantedX(), this.moveControl.getWantedY(), this.moveControl.getWantedZ(), 1, 0, 0, 0, 0);
-}
 
         //MOTMUtils.printToChat("Break cooldown: " + breakCoolDown);
 
@@ -322,7 +341,7 @@ public class CrescentKnight extends MoonMob implements GeoEntity {
     }
 
 
-    public static boolean crescentKnightSpawnRules(EntityType<CrescentKnight> entityType, LevelAccessor pLevel, MobSpawnType pSpawnType, BlockPos pPos, RandomSource pRandom) {
+    public static boolean leaperSpawnRules(EntityType<Leaper> entityType, LevelAccessor pLevel, MobSpawnType pSpawnType, BlockPos pPos, RandomSource pRandom) {
 
         if (pLevel.dayTime() < 13000) {
             return false;
@@ -336,4 +355,23 @@ public class CrescentKnight extends MoonMob implements GeoEntity {
         return false;
 
     }
+
+    public void tryJump(){
+
+        double heightDiff = this.moveControl.getWantedY() - this.getY();
+
+        if (heightDiff >= 2 && heightDiff < 11 && this.jumpCoolDown <= 0 && !this.isAttacking) {
+            this.triggerAnim("jump", "jump");
+            triggerJumpTime = this.tickCount + 5;
+            MOTMUtils.printToChat("Tried jump");
+        }
+
+        if (this.triggerJumpTime == this.tickCount) {
+            this.addDeltaMovement(new Vec3(0, heightDiff, 0));
+            jumpCoolDown = 100;
+        }
+
+        this.jumpCoolDown--;
+    }
+
 }
